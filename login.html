@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配信タイマーシステム - ログイン</title>
+    <style>
+        :root { --bg-color: #1a1a1a; --text-color: #ffffff; --accent-color: #ff4757; }
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-container { background: #2f3542; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); width: 100%; max-width: 400px; text-align: center; }
+        h1 { margin-bottom: 24px; font-size: 24px; color: var(--text-color); }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        label { display: block; margin-bottom: 8px; font-size: 14px; color: #a4b0be; }
+        input { width: 100%; padding: 12px; border: none; border-radius: 6px; background: #57606f; color: #fff; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; background: var(--accent-color); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; margin-top: 12px; }
+        button:hover { opacity: 0.9; }
+        #error-message { color: #ff6b6b; margin-top: 12px; font-size: 14px; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <h1>配信タイマー管理</h1>
+    <form id="login-form">
+        <div class="input-group">
+            <label>メールアドレス</label>
+            <input type="email" id="email" required autocomplete="username">
+        </div>
+        <div class="input-group">
+            <label>パスワード</label>
+            <input type="password" id="password" required autocomplete="current-password">
+        </div>
+        <button type="submit">ログイン</button>
+    </form>
+    <div id="error-message"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // ⚠️ あなたのFirebase接続情報を貼り付けてください
+    const firebaseConfig = {
+  apiKey: "AIzaSyBi4uh-EZ3d_WzuJDB26g70JqX5V4ww5_8",
+  authDomain: "pomodorotimersite.firebaseapp.com",
+  projectId: "pomodorotimersite",
+  storageBucket: "pomodorotimersite.firebasestorage.app",
+  messagingSenderId: "33972359215",
+  appId: "1:33972359215:web:9c00e72c984329e62ab6da",
+  measurementId: "G-8QLPFE8R9C"
+};
+
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const errMsg = document.getElementById('error-message');
+        errMsg.innerText = "";
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            window.location.href = 'admin.html';
+        } catch (error) {
+            errMsg.innerText = "ログインに失敗しました。認証情報を確認してください。";
+            console.error(error);
+        }
+    });
+</script>
+</body>
+</html>

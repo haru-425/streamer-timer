@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配信タイマーシステム</title>
+    <style>
+        :root { --text-color: #ffffff; --accent-color: #ff4757; }
+        body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; color: var(--text-color); height: 100vh; overflow: hidden; background-size: cover; background-position: center; background-color: #111; }
+        
+        /* 背面透過レイヤー */
+        .overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); z-index: 1; }
+
+        /* キー入力画面 */
+        #auth-screen { position: fixed; top:0; left:0; width:100%; height:100%; background:#111; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #auth-screen input { padding: 12px; font-size: 18px; border-radius: 6px; border: none; width: 250px; text-align: center; margin-bottom: 12px; }
+        #auth-screen button { padding: 12px 24px; font-size: 16px; font-weight:bold; background: var(--accent-color); border:none; color:white; border-radius:6px; cursor:pointer; }
+
+        /* メインUI（立ち絵より前面） */
+        .container { position: relative; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; text-align: center; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
+        h1 { margin-bottom: 5px; font-size: 2rem; }
+        #status-label { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-color); }
+        #timer-display { font-size: 7.5rem; font-weight: bold; font-variant-numeric: tabular-nums; margin: 10px 0; font-family: monospace; }
+        .set-counter { font-size: 1.2rem; margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; }
+
+        /* コントロール */
+        .controls { display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; justify-content: center; }
+        .btn { padding: 10px 20px; font-size: 1rem; font-weight: bold; border: 2px solid var(--text-color); background: rgba(0,0,0,0.6); color: var(--text-color); border-radius: 30px; cursor: pointer; transition: all 0.2s; }
+        .btn:hover { background: var(--accent-color); border-color: var(--accent-color); color: white; }
+        
+        /* 音量ミキサー */
+        .mixer { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 30px; }
+        .mixer label { font-size: 0.9rem; font-weight: bold; }
+
+        /* 立ち絵エリア（タイマーの背面・操作の邪魔をしない） */
+        .chara-container { position: absolute; bottom: 0; width: 35%; max-width: 450px; min-width: 200px; z-index: 5; pointer-events: none; transition: all 0.5s ease; }
+        .chara-container img { width: 100%; height: auto; display: block; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
+        .chara-left { left: 4%; }
+        .chara-right { right: 4%; }
+
+        /* ポップアップメッセージ */
+        #popup { position: fixed; top: 20%; left: 50%; transform: translate(-50%, -50%) scale(0.8); background: rgba(0,0,0,0.9); border: 3px solid var(--accent-color); padding: 20px 40px; border-radius: 12px; z-index: 100; text-align: center; opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #popup.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+        #popup h2 { margin: 0 0 10px 0; color: var(--accent-color); }
+        #popup button { padding: 8px 16px; background: var(--accent-color); border: none; color: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+        /* スマホ用レスポンシブ */
+        @media (max-width: 768px) {
+            #timer-display { font-size: 4.5rem; }
+            .chara-container { width: 45%; }
+            .btn { padding: 8px 14px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="overlay"></div>
+
+<div id="auth-screen" style="display: none;">
+    <h2 style="color:white; margin-bottom:20px;">🔒 限定公開タイマー</h2>
+    <input type="password" id="access-key-input" placeholder="アクセスキーを入力">
+    <button id="auth-submit-btn">入場する</button>
+    <p id="auth-error" style="color:#ff4757; margin-top:10px;"></p>
+</div>
+
+<div class="container">
+    <div id="status-label">READY</div>
+    <div id="timer-display">00:00</div>
+    <div class="set-counter">🚀 セット数: <span id="set-count">1</span></div>
+    
+    <div class="controls">
+        <button class="btn" id="start-btn">START</button>
+        <button class="btn" id="pause-btn">PAUSE</button>
+        <button class="btn" id="reset-btn">RESET</button>
+        <button class="btn" id="add-min-btn">+1分</button>
+        <button class="btn" id="sub-min-btn">-1分</button>
+    </div>
+
+    <div class="mixer">
+        <label id="mute-btn" style="cursor:pointer;">🔊 音量</label>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5">
+    </div>
+</div>
+
+<div id="chara-layer" class="chara-container">
+    <img id="chara-img" src="" alt="" style="display: none;">
+</div>
+
+<div id="popup">
+    <h2 id="popup-title">通知</h2>
+    <p id="popup-text">メッセージ</p>
+    <button onclick="closePopup()">閉じる</button>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ⚠️ あなたのFirebase接続情報を貼り付けてください
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // タイマー内部変数
+    let config = null;
+    let timerInterval = null;
+    let timeLeft = 0; 
+    let isWorking = true; // true: 作業時間, false: 休憩時間
+    let setIndex = 1;
+    let isMuted = false;
+    let globalVolume = 0.5;
+
+    // オーディオオブジェクト保持用
+    const audioPlayers = { work_bgm: null, break_bgm: null, alarm_sound: null, click_sound: null };
+
+    // パラメータ取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const timerId = urlParams.get('id') || 'normal';
+
+    // 初期化ロード
+    async function init() {
+        const docRef = doc(db, "timers", timerId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            config = docSnap.data();
+        } else {
+            alert("指定されたタイマー設定が見つかりません。デフォルトで開始します。");
+            config = {
+                theme_title: "デフォルトタイマー", text_color: "#ffffff", accent_color: "#ff4757",
+                chara_position: "right", work_minutes: 25, break_minutes: 5, finish_message: "時間になりました！"
+            };
+        }
+
+        // 限定モード判定
+        if (config.is_private_mode) {
+            const savedKey = localStorage.getItem(`auth_${timerId}`);
+            if (savedKey === config.access_key) {
+                setupTimerSystem();
+            } else {
+                showAuthScreen();
+            }
+        } else {
+            setupTimerSystem();
+        }
+    }
+
+    // 限定モードロック画面表示
+    function showAuthScreen() {
+        const screen = document.getElementById('auth-screen');
+        screen.style.display = 'flex';
+        document.getElementById('auth-submit-btn').onclick = () => {
+            const input = document.getElementById('access-key-input').value;
+            if (input === config.access_key) {
+                localStorage.setItem(`auth_${timerId}`, input);
+                screen.style.display = 'none';
+                setupTimerSystem();
+            } else {
+                document.getElementById('auth-error').innerText = "アクセスキーが正しくありません。";
+            }
+        };
+    }
+
+    // タイマーシステムの構築・デザイン適用
+    function setupTimerSystem() {
+        // スタイル同期
+        document.documentElement.style.setProperty('--text-color', config.text_color);
+        document.documentElement.style.setProperty('--accent-color', config.accent_color);
+        if(config.background_image) document.body.style.backgroundImage = `url('${config.background_image}')`;
+        
+        // 立ち絵設定
+        const charaLayer = document.getElementById('chara-layer');
+        const charaImg = document.getElementById('chara-img');
+        if (config.chara_image) {
+            charaImg.src = config.chara_image;
+            charaImg.style.display = 'block';
+            charaLayer.className = `chara-container chara-${config.chara_position || 'right'}`;
+        }
+
+        // 音声プリロード
+        if(config.work_bgm) { audioPlayers.work_bgm = new Audio(config.work_bgm); audioPlayers.work_bgm.loop = true; }
+        if(config.break_bgm) { audioPlayers.break_bgm = new Audio(config.break_bgm); audioPlayers.break_bgm.loop = true; }
+        if(config.alarm_sound) audioPlayers.alarm_sound = new Audio(config.alarm_sound);
+        if(config.click_sound) audioPlayers.click_sound = new Audio(config.click_sound);
+
+        resetTimer();
+        setupEventListeners();
+    }
+
+    // イベントリスナー紐付け
+    function setupEventListeners() {
+        document.getElementById('start-btn').addEventListener('click', () => { playSound('click_sound'); startTimer(); });
+        document.getElementById('pause-btn').addEventListener('click', () => { playSound('click_sound'); pauseTimer(); });
+        document.getElementById('reset-btn').addEventListener('click', () => { playSound('click_sound'); resetTimer(); });
+        document.getElementById('add-min-btn').addEventListener('click', () => { playSound('click_sound'); modifyTime(60); });
+        document.getElementById('sub-min-btn').addEventListener('click', () => { playSound('click_sound'); modifyTime(-60); });
+        
+        const slider = document.getElementById('volume-slider');
+        slider.addEventListener('input', (e) => {
+            globalVolume = e.target.value;
+            applyVolume();
+        });
+
+        document.getElementById('mute-btn').addEventListener('click', () => {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? "🔇 ミュート" : "🔊 音量";
+            applyVolume();
+        });
+    }
+
+    // 時間の表示更新
+    function updateDisplay() {
+        const mins = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+        const secs = (timeLeft % 60).toString().padStart(2, '0');
+        document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+        document.getElementById('status-label').innerText = isWorking ? "💻 WORK TIME" : "☕ BREAK TIME";
+        document.getElementById('set-count').innerText = setIndex;
+    }
+
+    // タイマー管理ロジック
+    function startTimer() {
+        if (timerInterval) return;
+        manageBGM();
+        timerInterval = setInterval(() => {
+            if (timeLeft > 0) {
+                timeLeft--;
+                updateDisplay();
+            } else {
+                switchPhase();
+            }
+        }, 1000);
+    }
+
+    function pauseTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        if(audioPlayers.work_bgm) audioPlayers.work_bgm.pause();
+        if(audioPlayers.break_bgm) audioPlayers.break_bgm.pause();
+    }
+
+    function resetTimer() {
+        pauseTimer();
+        isWorking = true;
+        setIndex = 1;
+        timeLeft = (config.work_minutes || 25) * 60;
+        updateDisplay();
+    }
+
+    function modifyTime(seconds) {
+        timeLeft += seconds;
+        if (timeLeft < 0) timeLeft = 0;
+        updateDisplay();
+    }
+
+    // ポモドーロ：フェーズ切り替え
+    function switchPhase() {
+        pauseTimer();
+        playSound('alarm_sound');
+
+        if (isWorking) {
+            // 作業終了 -> 休憩へ
+            isWorking = false;
+            timeLeft = (config.break_minutes || 5) * 60;
+            showPopup("⏱️ Work Done!", config.finish_message || "お疲れ様でした！");
+        } else {
+            // 休憩終了 -> 次のセットへ
+            isWorking = true;
+            setIndex++;
+            timeLeft = (config.work_minutes || 25) * 60;
+            showPopup("🔥 Break Done!", "次の作業を始めましょう！");
+        }
+        
+        updateDisplay();
+        startTimer(); // 自動で次のフェーズを開始
+    }
+
+    // サウンド処理
+    function playSound(type) {
+        const audio = audioPlayers[type];
+        if (audio) {
+            audio.muted = isMuted;
+            audio.volume = globalVolume;
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Audio play blocked by browser. Need user interaction."));
+        }
+    }
+
+    function manageBGM() {
+        if(isMuted) return;
+        
+        const currentBGM = isWorking ? audioPlayers.work_bgm : audioPlayers.break_bgm;
+        const targetBGM = isWorking ? audioPlayers.break_bgm : audioPlayers.work_bgm;
+
+        if(targetBGM) targetBGM.pause();
+        if(currentBGM) {
+            currentBGM.muted = isMuted;
+            currentBGM.volume = globalVolume;
+            currentBGM.play().catch(e => console.log("BGM play blocked"));
+        }
+    }
+
+    function applyVolume() {
+        Object.keys(audioPlayers).forEach(key => {
+            if(audioPlayers[key]) {
+                audioPlayers[key].muted = isMuted;
+                audioPlayers[key].volume = globalVolume;
+            }
+        });
+    }
+
+    // ポップアップ制御
+    function showPopup(title, msg) {
+        document.getElementById('popup-title').innerText = title;
+        document.getElementById('popup-text').innerText = msg;
+        document.getElementById('popup').classList.add('show');
+    }
+
+    window.closePopup = function() {
+        document.getElementById('popup').classList.remove('show');
+    }
+
+    // 開始
+    init();
+</script>
+</body>
+</html>

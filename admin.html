@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイマー管理画面</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f1f2f6; margin: 0; padding: 20px; color: #2f3542; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .main-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+        .sidebar { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }
+        .editor { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .list-item { padding: 12px; background: #f8f9fa; border: 1px solid #ddd; margin-bottom: 8px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .list-item:hover { background: #e1e2e6; }
+        .form-group { margin-bottom: 16px; }
+        .form-group.row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 14px; }
+        input[type="text"], input[type="number"], input[type="password"], select, textarea { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; box-sizing: border-box; }
+        .color-pickers { display: flex; gap: 10px; align-items: center; }
+        .color-pickers input[type="color"] { width: 50px; height: 40px; border: none; cursor: pointer; }
+        .radio-group { display: flex; gap: 15px; margin-top: 5px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn-primary { background: #1e90ff; color: white; }
+        .btn-danger { background: #ff4757; color: white; }
+        .btn-success { background: #2ed573; color: white; width: 100%; margin-bottom: 15px; }
+        .actions { margin-top: 25px; display: flex; gap: 10px; }
+        .view-link { font-size: 12px; color: #1e90ff; text-decoration: none; background: #e1f0ff; padding: 4px 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>⏰ タイマーカスタマイズ管理</h2>
+    <button class="btn btn-danger" id="logout-btn">ログアウト</button>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <button class="btn btn-success" id="new-timer-btn">+ 新規タイマー作成</button>
+        <div id="timer-list">読み込み中...</div>
+    </div>
+
+    <div class="editor" id="editor-section" style="display:none;">
+        <h3 id="form-title">タイマーの編集</h3>
+        <form id="timer-form">
+            <input type="hidden" id="doc-id">
+            
+            <div class="form-group row">
+                <div>
+                    <label>URLパラメータID (英数字/重複不可)</label>
+                    <input type="text" id="timer-id" required>
+                </div>
+                <div>
+                    <label>配信テーマ・タイトル</label>
+                    <input type="text" id="theme_title" required>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div>
+                    <label>文字色 / アクセント色</label>
+                    <div class="color-pickers">
+                        <input type="color" id="text_color" value="#ffffff">
+                        <input type="color" id="accent_color" value="#ff4757">
+                    </div>
+                </div>
+                <div>
+                    <label>立ち絵位置</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="chara_position" value="left" checked> 左下</label>
+                        <label><input type="radio" name="chara_position" value="right"> 右下</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div>
+                    <label>作業時間 (分)</label>
+                    <input type="number" id="work_minutes" min="1" value="25" required>
+                </div>
+                <div>
+                    <label>休憩時間 (分)</label>
+                    <input type="number" id="break_minutes" min="1" value="5" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>背景画像 URL</label>
+                <input type="text" id="background_image" placeholder="https://...">
+            </div>
+
+            <div class="form-group">
+                <label>立ち絵画像 URL</label>
+                <input type="text" id="chara_image" placeholder="https://...">
+            </div>
+
+            <div class="form-group row">
+                <div>
+                    <label>作業中 BGM URL</label>
+                    <input type="text" id="work_bgm" placeholder="https://...">
+                </div>
+                <div>
+                    <label>休憩中 BGM URL</label>
+                    <input type="text" id="break_bgm" placeholder="https://...">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <div>
+                    <label>アラーム音 URL (切り替わり時)</label>
+                    <input type="text" id="alarm_sound" placeholder="https://...">
+                </div>
+                <div>
+                    <label>クリック音 URL</label>
+                    <input type="text" id="click_sound" placeholder="https://...">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>終了時ポップアップメッセージ</label>
+                <textarea id="finish_message" rows="2">お疲れ様でした！タイマーが終了しました！</textarea>
+            </div>
+
+            <div class="form-group row" style="background: #fff0f2; padding: 15px; border-radius: 6px;">
+                <div>
+                    <label><input type="checkbox" id="is_private_mode"> 🔑 限定モード (要アクセスキー)</label>
+                </div>
+                <div>
+                    <label>アクセスキー文字列</label>
+                    <input type="password" id="access_key" placeholder="パスワードを設定">
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">データを保存する</button>
+                <button type="button" class="btn btn-danger" id="delete-btn">削除</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ⚠️ あなたのFirebase接続情報を貼り付けてください
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let allTimers = {};
+
+    // 認証チェック
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            window.location.href = 'login.html';
+        } else {
+            loadTimers();
+        }
+    });
+
+    // ログアウト
+    document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+    // タイマー一覧読み込み
+    async function loadTimers() {
+        const querySnapshot = await getDocs(collection(db, "timers"));
+        const listDiv = document.getElementById('timer-list');
+        listDiv.innerHTML = "";
+        allTimers = {};
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            allTimers[doc.id] = data;
+
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            item.innerHTML = `
+                <span>${data.theme_title} (${doc.id})</span>
+                <a href="index.html?id=${doc.id}" target="_blank" class="view-link">表示</a>
+            `;
+            item.addEventListener('click', (e) => {
+                if(!e.target.classList.contains('view-link')) editTimer(doc.id);
+            });
+            listDiv.appendChild(item);
+        });
+    }
+
+    // 編集フォームの展開
+    window.editTimer = function(id) {
+        const timer = allTimers[id];
+        document.getElementById('editor-section').style.display = 'block';
+        document.getElementById('form-title').innerText = `タイマー編集 (${id})`;
+        
+        document.getElementById('doc-id').value = id;
+        document.getElementById('timer-id').value = id;
+        document.getElementById('timer-id').disabled = true; // 編集時はID変更不可
+
+        document.getElementById('theme_title').value = timer.theme_title || '';
+        document.getElementById('text_color').value = timer.text_color || '#ffffff';
+        document.getElementById('accent_color').value = timer.accent_color || '#ff4757';
+        document.querySelector(`input[name="chara_position"][value="${timer.chara_position || 'left'}"]`).checked = true;
+        document.getElementById('work_minutes').value = timer.work_minutes || 25;
+        document.getElementById('break_minutes').value = timer.break_minutes || 5;
+        document.getElementById('background_image').value = timer.background_image || '';
+        document.getElementById('chara_image').value = timer.chara_image || '';
+        document.getElementById('work_bgm').value = timer.work_bgm || '';
+        document.getElementById('break_bgm').value = timer.break_bgm || '';
+        document.getElementById('alarm_sound').value = timer.alarm_sound || '';
+        document.getElementById('click_sound').value = timer.click_sound || '';
+        document.getElementById('finish_message').value = timer.finish_message || '';
+        document.getElementById('is_private_mode').checked = timer.is_private_mode || false;
+        document.getElementById('access_key').value = timer.access_key || '';
+        document.getElementById('delete-btn').style.display = 'block';
+    }
+
+    // 新規作成ボタン
+    document.getElementById('new-timer-btn').addEventListener('click', () => {
+        document.getElementById('editor-section').style.display = 'block';
+        document.getElementById('form-title').innerText = "新規タイマー作成";
+        document.getElementById('timer-form').reset();
+        document.getElementById('doc-id').value = "";
+        document.getElementById('timer-id').disabled = false;
+        document.getElementById('delete-btn').style.display = 'none';
+    });
+
+    // 保存処理
+    document.getElementById('timer-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('timer-id').value.trim();
+        if(!id) return;
+
+        const timerData = {
+            theme_title: document.getElementById('theme_title').value,
+            text_color: document.getElementById('text_color').value,
+            accent_color: document.getElementById('accent_color').value,
+            chara_position: document.querySelector('input[name="chara_position"]:checked').value,
+            work_minutes: parseInt(document.getElementById('work_minutes').value),
+            break_minutes: parseInt(document.getElementById('break_minutes').value),
+            background_image: document.getElementById('background_image').value,
+            chara_image: document.getElementById('chara_image').value,
+            work_bgm: document.getElementById('work_bgm').value,
+            break_bgm: document.getElementById('break_bgm').value,
+            alarm_sound: document.getElementById('alarm_sound').value,
+            click_sound: document.getElementById('click_sound').value,
+            finish_message: document.getElementById('finish_message').value,
+            is_private_mode: document.getElementById('is_private_mode').checked,
+            access_key: document.getElementById('access_key').value
+        };
+
+        await setDoc(doc(db, "timers", id), timerData);
+        alert("保存しました");
+        document.getElementById('editor-section').style.display = 'none';
+        loadTimers();
+    });
+
+    // 削除処理
+    document.getElementById('delete-btn').addEventListener('click', async () => {
+        const id = document.getElementById('doc-id').value;
+        if(id && confirm(`本当にタイマー「${id}」を削除しますか？`)) {
+            await deleteDoc(doc(db, "timers", id));
+            document.getElementById('editor-section').style.display = 'none';
+            loadTimers();
+        }
+    });
+</script>
+</body>
+</html>
