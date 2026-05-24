@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>配信タイマーシステム - ログイン/登録</title>
+    <title>ログイン/登録</title>
     <style>
         :root { --bg-color: #1a1a1a; --text-color: #ffffff; --accent-color: #ff4757; }
         body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
@@ -21,7 +21,7 @@
 <body>
 
 <div class="login-container">
-    <h1 id="form-title">配信タイマー管理 ログイン</h1>
+    <h1 id="form-title">タイマー管理 ログイン</h1>
     
     <form id="auth-form">
         <div class="input-group">
@@ -69,11 +69,11 @@ const firebaseConfig = {
         isLoginMode = !isLoginMode;
         errMsg.innerText = "";
         if (isLoginMode) {
-            formTitle.innerText = "配信タイマー管理 ログイン";
+            formTitle.innerText = "タイマー管理 ログイン";
             submitBtn.innerText = "ログイン";
             toggleLink.innerText = "新規アカウント作成はこちら";
         } else {
-            formTitle.innerText = "配信者 新規アカウント登録";
+            formTitle.innerText = "新規アカウント登録";
             submitBtn.innerText = "新しくアカウントを作る";
             toggleLink.innerText = "すでに登録済みの場合はログイン";
         }

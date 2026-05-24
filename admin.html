@@ -250,20 +250,32 @@ document.getElementById('new-timer-btn').addEventListener('click', () => {
     document.getElementById('delete-btn').style.display = 'none';
 });
 
-// 保存処理（uidを付与する）
+// 保存処理（パスワード暗号化対応版）
 document.getElementById('timer-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('timer-id').value.trim();
     if(!id) return;
 
-    // 【注意】URLパラメータID（ドキュメントID）の重複チェック
-    if (!document.getElementById('doc-id').value) {
-        // 新規作成時のみ、すでにそのIDが使われていないかチェックが必要ですが、
-        // 今回はシンプル運用のために「上書き注意」の運用、または個人ごとに被らないID（例: 配信者名-normal など）を推奨します。
+    let rawAccessKey = document.getElementById('access_key').value;
+    let finalAccessKey = rawAccessKey;
+
+    // 限定モードがON、かつパスワードが入力されている場合、SHA-256でハッシュ化する
+    const isPrivate = document.getElementById('is_private_mode').checked;
+    if (isPrivate && rawAccessKey) {
+        // すでにハッシュ化済みの文字列（64文字の英数字）でなければ、新規にハッシュ化する
+        const isAlreadyHashed = /^[a-f0-9]{64}$/i.test(rawAccessKey);
+        
+        if (!isAlreadyHashed) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(rawAccessKey);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            finalAccessKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
     }
 
     const timerData = {
-        uid: currentUid, // 👑 誰のデータかを保存
+        uid: currentUid,
         theme_title: document.getElementById('theme_title').value,
         text_color: document.getElementById('text_color').value,
         accent_color: document.getElementById('accent_color').value,
@@ -277,8 +289,8 @@ document.getElementById('timer-form').addEventListener('submit', async (e) => {
         alarm_sound: document.getElementById('alarm_sound').value,
         click_sound: document.getElementById('click_sound').value,
         finish_message: document.getElementById('finish_message').value,
-        is_private_mode: document.getElementById('is_private_mode').checked,
-        access_key: document.getElementById('access_key').value
+        is_private_mode: isPrivate,
+        access_key: finalAccessKey // 👑 暗号化された文字列が保存される
     };
 
     try {
@@ -288,7 +300,7 @@ document.getElementById('timer-form').addEventListener('submit', async (e) => {
         loadTimers();
     } catch (error) {
         console.error("Firestore Save Error:", error);
-        alert("保存に失敗しました。このIDは他の配信者がすでに使用している可能性があります。");
+        alert("保存に失敗しました。");
     }
 });
 
